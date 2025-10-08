@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUD Google Spreadsheet</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #eef2f7; padding: 20px; }
+    h2 { text-align: center; color: #333; }
+    form {
+      background: white; padding: 20px; border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 500px;
+      margin: 0 auto 30px;
+    }
+    label { display: block; margin-top: 10px; color: #444; }
+    input {
+      width: 100%; padding: 10px; margin-top: 5px;
+      border: 1px solid #ccc; border-radius: 8px;
+    }
+    button {
+      margin-top: 15px; background-color: #007bff; color: white;
+      border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;
+    }
+    button:hover { background-color: #0056b3; }
+    table {
+      width: 100%; border-collapse: collapse; background: white;
+      border-radius: 10px; overflow: hidden;
+    }
+    th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+    th { background-color: #007bff; color: white; }
+    tr:hover { background-color: #f1f1f1; }
+    .delete-btn {
+      background: red; color: white; border: none; padding: 5px 10px;
+      border-radius: 5px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>📋 CRUD Data Pegawai (Google Spreadsheet)</h2>
+
+  <form id="formData">
+    <label>Nama:</label>
+    <input type="text" id="nama" required>
+    <label>NPP:</label>
+    <input type="text" id="npp" required>
+    <label>Divisi:</label>
+    <input type="text" id="divisi" required>
+    <label>Jabatan:</label>
+    <input type="text" id="jabatan" required>
+    <button type="submit">Tambah Data</button>
+  </form>
+
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Nama</th>
+        <th>NPP</th>
+        <th>Divisi</th>
+        <th>Jabatan</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+ <script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUx8uevOpX8toXrvWl5sNP4m_9ptrZ8xlc_lsCCXiddCD9FtJdtWjXcjHJzuYLHeIL/exec";
+
+  const tableBody = document.querySelector("#dataTable tbody");
+  const form = document.getElementById("formData");
+
+  async function loadData() {
+    tableBody.innerHTML = "<tr><td colspan='5'>Loading...</td></tr>";
+    try {
+      const res = await fetch(SCRIPT_URL);
+      const data = await res.json();
+      const rows = data.slice(1);
+      tableBody.innerHTML = "";
+      rows.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row[0]||''}</td>
+          <td>${row[1]||''}</td>
+          <td>${row[2]||''}</td>
+          <td>${row[3]||''}</td>
+          <td><button class="delete-btn" onclick="deleteData('${row[1]}')">Hapus</button></td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error("loadData error:", err);
+      tableBody.innerHTML = "<tr><td colspan='5'>Gagal memuat data</td></tr>";
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const payload = {
+      nama: document.getElementById("nama").value,
+      npp: document.getElementById("npp").value,
+      divisi: document.getElementById("divisi").value,
+      jabatan: document.getElementById("jabatan").value
+    };
+
+    try {
+      // NOTE: jangan sertakan headers Content-Type -> hindari preflight
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+
+      // debug: lihat status & body
+      console.log("status", res.status, res.statusText);
+      const text = await res.text();
+      console.log("response text:", text);
+
+      // coba parse JSON
+      let result;
+      try { result = JSON.parse(text); } catch(e){ result = { message: text }; }
+
+      if (res.ok) {
+        alert(result.message || "Data ditambahkan");
+        form.reset();
+        loadData();
+      } else {
+        alert("Gagal menambahkan data: " + (result.message || res.status));
+      }
+    } catch (err) {
+      console.error("submit error:", err);
+      alert("❌ Gagal menambahkan data (network/CORS). Cek Console dan Network tab.");
+    }
+  });
+
+  async function deleteData(npp) {
+    if (!confirm(`Yakin hapus NPP ${npp}?`)) return;
+    try {
+      // gunakan query param action=delete untuk server tahu ini hapus
+      const res = await fetch(SCRIPT_URL + '?action=delete', {
+        method: "POST",
+        body: JSON.stringify({ npp })
+      });
+      const text = await res.text();
+      let result;
+      try { result = JSON.parse(text); } catch(e){ result = { message: text }; }
+      alert(result.message || "Operasi selesai");
+      loadData();
+    } catch (err) {
+      console.error("delete error:", err);
+      alert("❌ Gagal menghapus data");
+    }
+  }
+
+  loadData();
+  // expose deleteData ke global (untuk onclick inlined)
+  window.deleteData = deleteData;
+</script>
+</body>
+</html>
