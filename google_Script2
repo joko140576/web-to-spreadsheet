@@ -1,0 +1,51 @@
+function doGet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Sheet1");
+  const data = sheet.getDataRange().getValues();
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Sheet1");
+  
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const action = e.parameter.action || body.action;
+
+    // === Tambah data baru ===
+    if (!action) {
+      sheet.appendRow([body.nama, body.npp, body.divisi, body.jabatan]);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "success", message: "✅ Data berhasil ditambahkan" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // === Hapus data berdasarkan NPP ===
+    if (action === "delete" && body.npp) {
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) { // skip header
+        if (data[i][1] == body.npp) { // kolom NPP
+          sheet.deleteRow(i + 1);
+          return ContentService
+            .createTextOutput(JSON.stringify({ status: "success", message: `🗑️ Data NPP ${body.npp} berhasil dihapus` }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "error", message: "NPP tidak ditemukan" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: "Aksi tidak valid" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
